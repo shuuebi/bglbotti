@@ -3,12 +3,42 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_FILE = 'data.json';
+const CONFIG_FILE = 'config.json';
+
+let writeLock = false;
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
   ]
 });
+
+function loadConfig() {
+  if (fs.existsSync(CONFIG_FILE)) {
+    const rawData = fs.readFileSync(CONFIG_FILE);
+    return JSON.parse(rawData);
+  }
+  return {
+    users: {
+      grilli: null,
+      masa: null
+    }
+  };
+}
+
+async function saveConfig(config) {
+  while (writeLock) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  writeLock = true;
+  try {
+    const tempFile = CONFIG_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(config, null, 2));
+    fs.renameSync(tempFile, CONFIG_FILE);
+  } finally {
+    writeLock = false;
+  }
+}
 
 function loadData() {
   if (fs.existsSync(DATA_FILE)) {
@@ -21,27 +51,39 @@ function loadData() {
   };
 }
 
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function saveData(data) {
+  while (writeLock) {
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  writeLock = true;
+  try {
+    const tempFile = DATA_FILE + '.tmp';
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2));
+    fs.renameSync(tempFile, DATA_FILE);
+  } finally {
+    writeLock = false;
+  }
 }
 
-function getUserKey(username) {
-  const lowerName = username.toLowerCase();
-  if (lowerName.includes('grilli')) return 'grilli';
-  if (lowerName.includes('masa') || lowerName.includes('m4sa')) return 'masa';
+function getUserKeyById(userId) {
+  const config = loadConfig();
+  if (config.users.grilli === userId) return 'grilli';
+  if (config.users.masa === userId) return 'masa';
   return null;
 }
 
 function parseAmount(input) {
-  const match = input.match(/^(\d+(?:\.\d+)?)\s*bgl$/i);
+  const normalized = input.toLowerCase().trim().replace(/\s+/g, '');
+  const match = normalized.match(/^(\d+(?:[.,]\d+)?)(?:bgl)?$/);
   if (match) {
-    return parseFloat(match[1]);
+    return parseFloat(match[1].replace(',', '.'));
   }
   return null;
 }
 
 function parsePrice(input) {
-  const match = input.match(/^([+-])?\s*(\d+(?:[.,]\d+)?)\s*€?$/);
+  const normalized = input.trim().replace(/\s+/g, '');
+  const match = normalized.match(/^([+-])?\s*(\d+(?:[.,]\d+)?)\s*€?$/);
   if (match) {
     const price = parseFloat(match[2].replace(',', '.'));
     return match[1] === '-' ? -price : price;
@@ -51,18 +93,34 @@ function parsePrice(input) {
 
 const commands = [
   {
+    name: 'setup',
+    description: 'Rekisteröi itsesi käyttäjäksi (Grilli tai Masa)',
+    options: [
+      {
+        name: 'user',
+        description: 'Valitse käyttäjä',
+        type: 3,
+        required: true,
+        choices: [
+          { name: 'Grilli', value: 'grilli' },
+          { name: 'Masa', value: 'masa' }
+        ]
+      }
+    ]
+  },
+  {
     name: 'bought',
     description: 'Kirjaa BGL:ien osto',
     options: [
       {
         name: 'amount',
-        description: 'Määrä (esim. 10bgl)',
+        description: 'Määrä (esim. 10bgl tai 10)',
         type: 3,
         required: true
       },
       {
         name: 'price',
-        description: 'Hinta (esim. -25€ tai 25€)',
+        description: 'Hinta (esim. -25€, 25€ tai 25)',
         type: 3,
         required: true
       }
@@ -74,13 +132,13 @@ const commands = [
     options: [
       {
         name: 'amount',
-        description: 'Määrä (esim. 10bgl)',
+        description: 'Määrä (esim. 10bgl tai 10)',
         type: 3,
         required: true
       },
       {
         name: 'price',
-        description: 'Hinta (esim. +35€ tai 35€)',
+        description: 'Hinta (esim. +35€, 35€ tai 35)',
         type: 3,
         required: true
       }
@@ -112,11 +170,38 @@ client.once('ready', async () => {
 client.on('interactionCreate', async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  const userKey = getUserKey(interaction.user.username);
+  if (interaction.commandName === 'setup') {
+    const selectedUser = interaction.options.getString('user');
+    const config = loadConfig();
+    
+    if (config.users[selectedUser] && config.users[selectedUser] !== interaction.user.id) {
+      await interaction.reply({
+        content: `❌ ${selectedUser.toUpperCase()} on jo rekisteröity toiselle käyttäjälle.`,
+        ephemeral: true
+      });
+      return;
+    }
+    
+    const otherUser = selectedUser === 'grilli' ? 'masa' : 'grilli';
+    if (config.users[otherUser] === interaction.user.id) {
+      config.users[otherUser] = null;
+    }
+    
+    config.users[selectedUser] = interaction.user.id;
+    await saveConfig(config);
+    
+    await interaction.reply({
+      content: `✅ Olet nyt rekisteröity käyttäjänä **${selectedUser.toUpperCase()}**!`,
+      ephemeral: true
+    });
+    return;
+  }
+
+  const userKey = getUserKeyById(interaction.user.id);
   
   if (!userKey && interaction.commandName !== 'stats') {
     await interaction.reply({
-      content: '❌ Käyttäjääsi ei tunnistettu. Vain Grilli ja Masa voivat käyttää tätä komentoa.',
+      content: '❌ Et ole rekisteröitynyt. Käytä ensin `/setup` komentoa valitaksesi Grilli tai Masa.',
       ephemeral: true
     });
     return;
@@ -133,7 +218,7 @@ client.on('interactionCreate', async interaction => {
 
     if (amount === null) {
       await interaction.reply({
-        content: '❌ Virheellinen määrä. Käytä muotoa: 10bgl',
+        content: '❌ Virheellinen määrä. Käytä muotoa: 10bgl, 10 bgl tai 10',
         ephemeral: true
       });
       return;
@@ -141,7 +226,7 @@ client.on('interactionCreate', async interaction => {
 
     if (price === null) {
       await interaction.reply({
-        content: '❌ Virheellinen hinta. Käytä muotoa: -25€ tai 25€',
+        content: '❌ Virheellinen hinta. Käytä muotoa: -25€, -25, 25€ tai 25',
         ephemeral: true
       });
       return;
@@ -156,7 +241,7 @@ client.on('interactionCreate', async interaction => {
     });
     data[userKey].inventory += amount;
 
-    saveData(data);
+    await saveData(data);
 
     await interaction.reply({
       content: `✅ **${userKey.toUpperCase()}** osti **${amount} BGL** hintaan **${actualPrice}€**\n💼 Varasto: **${data[userKey].inventory} BGL**`,
@@ -173,7 +258,7 @@ client.on('interactionCreate', async interaction => {
 
     if (amount === null) {
       await interaction.reply({
-        content: '❌ Virheellinen määrä. Käytä muotoa: 10bgl',
+        content: '❌ Virheellinen määrä. Käytä muotoa: 10bgl, 10 bgl tai 10',
         ephemeral: true
       });
       return;
@@ -181,7 +266,7 @@ client.on('interactionCreate', async interaction => {
 
     if (price === null) {
       await interaction.reply({
-        content: '❌ Virheellinen hinta. Käytä muotoa: +35€ tai 35€',
+        content: '❌ Virheellinen hinta. Käytä muotoa: +35€, +35, 35€ tai 35',
         ephemeral: true
       });
       return;
@@ -204,7 +289,7 @@ client.on('interactionCreate', async interaction => {
     });
     data[userKey].inventory -= amount;
 
-    saveData(data);
+    await saveData(data);
 
     await interaction.reply({
       content: `✅ **${userKey.toUpperCase()}** myi **${amount} BGL** hintaan **+${actualPrice}€**\n💼 Varasto: **${data[userKey].inventory} BGL**`,

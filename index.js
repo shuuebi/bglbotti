@@ -169,6 +169,18 @@ const commands = [
   {
     name: 'stats',
     description: 'Näytä kaupankäynti tilastot'
+  },
+  {
+    name: 'reset',
+    description: 'Nollaa kaikki tilastot (VAROITUS: Poistaa kaikki tiedot!)',
+    options: [
+      {
+        name: 'confirm',
+        description: 'Kirjoita RESET vahvistaaksesi',
+        type: 3,
+        required: true
+      }
+    ]
   }
 ];
 
@@ -399,6 +411,40 @@ client.on('interactionCreate', async interaction => {
       .setTimestamp();
 
     await interaction.reply({ embeds: [embed] });
+  }
+
+  else if (interaction.commandName === 'reset') {
+    const userKey = getUserKeyById(interaction.user.id);
+    
+    if (!userKey) {
+      await interaction.reply({
+        content: '❌ Vain rekisteröityneet käyttäjät (Grilli tai Masa) voivat nollata tilastot.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    const confirmation = interaction.options.getString('confirm');
+
+    if (confirmation !== 'RESET') {
+      await interaction.reply({
+        content: '❌ Vahvistus epäonnistui. Kirjoita täsmälleen `RESET` vahvistaaksesi tietojen poiston.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    const freshData = {
+      grilli: { bought: [], sold: [], inventory: 0 },
+      masa: { bought: [], sold: [], inventory: 0 }
+    };
+
+    await saveData(freshData);
+
+    await interaction.reply({
+      content: '✅ **Kaikki tilastot nollattu!**\n\nKaikki ostot, myynnit ja varastot on poistettu.\nKäyttäjien rekisteröinnit säilyvät ennallaan.',
+      ephemeral: false
+    });
   }
 });
 

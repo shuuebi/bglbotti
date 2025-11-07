@@ -8,6 +8,7 @@ Discord-botti BGL-kaupankäynnin seurantaan. Botti seuraa Grillin ja Masan BGL-o
 - `/bought` - Kirjaa BGL-ostot ja lisää varastoon
 - `/sold` - Kirjaa BGL-myynnit, vähentää varastosta ja laskee voiton
 - `/stats` - Näyttää kaikki tilastot yhdessä paneelissa (varasto, ostot, myynnit, voitot)
+- `/reset` - Nollaa kaikki tilastot (vaatii vahvistuksen)
 - Turvallinen käyttäjätunnistus Discord user ID:n perusteella
 - Joustava syöttömuoto (hyväksyy "10bgl", "10 bgl", "10", "-25€", "-25", jne.)
 - Voitot jaetaan puoliksi Grillin ja Masan välillä
@@ -89,6 +90,15 @@ Näyttää koko tilastopaneelin:
 - Yhteisvoitto ja puoliksi jaettu voitto per henkilö
 - **Maksutapojen erittely**: Paljon rahaa ja myyty kullakin maksutavalla (Crypto, PayPal, MobilePay)
 
+### 5. Tilastojen Nollaaminen
+```
+/reset confirm:RESET
+```
+**VAROITUS:** Tämä poistaa kaikki ostot, myynnit ja varastotiedot!
+- Vain rekisteröityneet käyttäjät (Grilli tai Masa) voivat käyttää tätä komentoa
+- Vahvistukseksi täytyy kirjoittaa täsmälleen `RESET`
+- Käyttäjien rekisteröinnit säilyvät ennallaan
+
 ## Käyttäjätunnistus
 Botti tunnistaa käyttäjät turvallisesti Discord user ID:n perusteella:
 - Käytä `/setup` komentoa rekisteröityäksesi Grilliksi tai Masaksi
@@ -116,16 +126,17 @@ Kaikki kaupat tallennetaan `data.json` tiedostoon seuraavassa muodossa:
 ## Viimeisimmät Muutokset
 - 7.11.2024: Projekti luotu
 - Discord.js 14 integraatio
-- Slash-komennot (/setup, /bought, /sold, /stats)
+- Slash-komennot (/setup, /bought, /sold, /stats, /reset)
 - User ID -pohjainen tunnistus (turvallinen ja luotettava)
 - Joustava syöttömuoto (hyväksyy eri formaatteja)
 - Atominen tietojen tallennus lukituksella (estää tiedostojen korruptoitumisen)
 - JSON-tietojen tallennus
 - Voittojen jako puoliksi
+- Maksutapojen seuranta (Crypto, PayPal, MobilePay)
+- /reset komento tilastojen nollaamiseen (vaatii vahvistuksen)
 
 ## Jatkokehitysideat
 - `/history` komento kaikkien kauppojen näyttämiseen aikajärjestyksessä
 - Päivittäiset/viikottaiset raportit automaattisesti
-- `/reset` komento tilastojen nollaamiseen (admin-oikeudet)
 - Graafiset kaaviot voitoista
 - Tietokannan varmuuskopiointi

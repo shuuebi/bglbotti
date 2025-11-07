@@ -123,6 +123,17 @@ const commands = [
         description: 'Hinta (esim. -25€, 25€ tai 25)',
         type: 3,
         required: true
+      },
+      {
+        name: 'payment',
+        description: 'Maksutapa',
+        type: 3,
+        required: true,
+        choices: [
+          { name: 'Crypto', value: 'crypto' },
+          { name: 'PayPal', value: 'paypal' },
+          { name: 'MobilePay', value: 'mobilepay' }
+        ]
       }
     ]
   },
@@ -141,6 +152,17 @@ const commands = [
         description: 'Hinta (esim. +35€, 35€ tai 35)',
         type: 3,
         required: true
+      },
+      {
+        name: 'payment',
+        description: 'Maksutapa',
+        type: 3,
+        required: true,
+        choices: [
+          { name: 'Crypto', value: 'crypto' },
+          { name: 'PayPal', value: 'paypal' },
+          { name: 'MobilePay', value: 'mobilepay' }
+        ]
       }
     ]
   },
@@ -212,6 +234,7 @@ client.on('interactionCreate', async interaction => {
   if (interaction.commandName === 'bought') {
     const amountInput = interaction.options.getString('amount');
     const priceInput = interaction.options.getString('price');
+    const payment = interaction.options.getString('payment');
 
     const amount = parseAmount(amountInput);
     const price = parsePrice(priceInput);
@@ -237,6 +260,7 @@ client.on('interactionCreate', async interaction => {
     data[userKey].bought.push({
       amount: amount,
       price: actualPrice,
+      payment: payment,
       timestamp: new Date().toISOString()
     });
     data[userKey].inventory += amount;
@@ -244,7 +268,7 @@ client.on('interactionCreate', async interaction => {
     await saveData(data);
 
     await interaction.reply({
-      content: `✅ **${userKey.toUpperCase()}** osti **${amount} BGL** hintaan **${actualPrice}€**\n💼 Varasto: **${data[userKey].inventory} BGL**`,
+      content: `✅ **${userKey.toUpperCase()}** osti **${amount} BGL** hintaan **${actualPrice}€** (${payment.toUpperCase()})\n💼 Varasto: **${data[userKey].inventory} BGL**`,
       ephemeral: false
     });
   }
@@ -252,6 +276,7 @@ client.on('interactionCreate', async interaction => {
   else if (interaction.commandName === 'sold') {
     const amountInput = interaction.options.getString('amount');
     const priceInput = interaction.options.getString('price');
+    const payment = interaction.options.getString('payment');
 
     const amount = parseAmount(amountInput);
     const price = parsePrice(priceInput);
@@ -285,6 +310,7 @@ client.on('interactionCreate', async interaction => {
     data[userKey].sold.push({
       amount: amount,
       price: actualPrice,
+      payment: payment,
       timestamp: new Date().toISOString()
     });
     data[userKey].inventory -= amount;
@@ -292,7 +318,7 @@ client.on('interactionCreate', async interaction => {
     await saveData(data);
 
     await interaction.reply({
-      content: `✅ **${userKey.toUpperCase()}** myi **${amount} BGL** hintaan **+${actualPrice}€**\n💼 Varasto: **${data[userKey].inventory} BGL**`,
+      content: `✅ **${userKey.toUpperCase()}** myi **${amount} BGL** hintaan **+${actualPrice}€** (${payment.toUpperCase()})\n💼 Varasto: **${data[userKey].inventory} BGL**`,
       ephemeral: false
     });
   }
@@ -310,6 +336,25 @@ client.on('interactionCreate', async interaction => {
 
     const totalProfit = grilliProfit + masaProfit;
     const profitPerPerson = totalProfit / 2;
+
+    const paymentMethods = ['crypto', 'paypal', 'mobilepay'];
+    const paymentStats = {};
+    
+    paymentMethods.forEach(method => {
+      const boughtGrilli = data.grilli.bought.filter(t => t.payment === method).reduce((sum, t) => sum + t.price, 0);
+      const boughtMasa = data.masa.bought.filter(t => t.payment === method).reduce((sum, t) => sum + t.price, 0);
+      const soldGrilli = data.grilli.sold.filter(t => t.payment === method).reduce((sum, t) => sum + t.price, 0);
+      const soldMasa = data.masa.sold.filter(t => t.payment === method).reduce((sum, t) => sum + t.price, 0);
+      
+      const soldAmountGrilli = data.grilli.sold.filter(t => t.payment === method).reduce((sum, t) => sum + t.amount, 0);
+      const soldAmountMasa = data.masa.sold.filter(t => t.payment === method).reduce((sum, t) => sum + t.amount, 0);
+      
+      paymentStats[method] = {
+        totalMoney: (boughtGrilli + boughtMasa + soldGrilli + soldMasa),
+        soldAmount: soldAmountGrilli + soldAmountMasa,
+        soldMoney: soldGrilli + soldMasa
+      };
+    });
 
     const embed = new EmbedBuilder()
       .setColor(0x00ff00)
@@ -334,6 +379,21 @@ client.on('interactionCreate', async interaction => {
           name: '💰 Yhteensä', 
           value: `Kokonaisvoitto: **${totalProfit.toFixed(2)}€**\nPuoliksi jaettuna: **${profitPerPerson.toFixed(2)}€** / henkilö`, 
           inline: false 
+        },
+        {
+          name: '💳 Maksutavat - Crypto',
+          value: `Raha: ${paymentStats.crypto.totalMoney.toFixed(2)}€\nMyyty: ${paymentStats.crypto.soldAmount} BGL (${paymentStats.crypto.soldMoney.toFixed(2)}€)`,
+          inline: true
+        },
+        {
+          name: '💳 Maksutavat - PayPal',
+          value: `Raha: ${paymentStats.paypal.totalMoney.toFixed(2)}€\nMyyty: ${paymentStats.paypal.soldAmount} BGL (${paymentStats.paypal.soldMoney.toFixed(2)}€)`,
+          inline: true
+        },
+        {
+          name: '💳 Maksutavat - MobilePay',
+          value: `Raha: ${paymentStats.mobilepay.totalMoney.toFixed(2)}€\nMyyty: ${paymentStats.mobilepay.soldAmount} BGL (${paymentStats.mobilepay.soldMoney.toFixed(2)}€)`,
+          inline: true
         }
       )
       .setTimestamp();

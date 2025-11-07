@@ -62,22 +62,21 @@ tai
 Botti muistaa sinut Discord user ID:si perusteella, joten voit vaihtaa käyttäjänimesi ilman ongelmia.
 
 ### 2. Ostojen Kirjaaminen
-Botti hyväksyy useita eri formaatteja:
+Botti hyväksyy useita eri formaatteja ja vaatii maksutavan valinnan:
 ```
-/bought amount:10bgl price:-25€
-/bought amount:10 bgl price:-25
-/bought amount:10 price:25
+/bought amount:10bgl price:-25€ payment:crypto
+/bought amount:10 bgl price:-25 payment:paypal
+/bought amount:10 price:25 payment:mobilepay
 ```
-Kaikki nämä toimivat ja lisäävät 10 BGL varastoon hintaan -25€.
+Maksutavat: **Crypto**, **PayPal**, **MobilePay**
 
 ### 3. Myyntien Kirjaaminen
-Sama joustavuus myös myynneissä:
+Sama joustavuus myös myynneissä, maksutapa pakollinen:
 ```
-/sold amount:10bgl price:+35€
-/sold amount:10 bgl price:35€
-/sold amount:10 price:35
+/sold amount:10bgl price:+35€ payment:crypto
+/sold amount:10 bgl price:35€ payment:paypal
+/sold amount:10 price:35 payment:mobilepay
 ```
-Kaikki poistavat 10 BGL varastosta ja kirjaavat myynnin hintaan +35€.
 
 ### 4. Tilastojen Tarkastelu
 ```
@@ -88,6 +87,7 @@ Näyttää koko tilastopaneelin:
 - Grillin ostot, myynnit ja voitto
 - Masan ostot, myynnit ja voitto
 - Yhteisvoitto ja puoliksi jaettu voitto per henkilö
+- **Maksutapojen erittely**: Paljon rahaa ja myyty kullakin maksutavalla (Crypto, PayPal, MobilePay)
 
 ## Käyttäjätunnistus
 Botti tunnistaa käyttäjät turvallisesti Discord user ID:n perusteella:
